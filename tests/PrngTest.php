@@ -213,6 +213,47 @@ class PrngTest extends TestCase
         }
     }
 
+    public function testFloatReachesMaxEndpointWhenStepDividesRangeEvenly(): void
+    {
+        $maxSeen = false;
+
+        for ($i = 0; $i < 500; $i++) {
+            $value = (new Prng("seed-{$i}"))->float('key', ['min' => 0, 'max' => 90, 'step' => 90]);
+
+            $this->assertTrue($value === 0.0 || $value === 90.0, "Expected 0 or 90, got {$value}");
+            if ($value === 90.0) {
+                $maxSeen = true;
+            }
+        }
+
+        $this->assertTrue($maxSeen, 'Expected 90 to appear at least once across 500 seeds');
+    }
+
+    public function testFloatDistributesSteppedValuesRoughlyUniformly(): void
+    {
+        $buckets = [0 => 0, 45 => 0, 90 => 0, 135 => 0, 180 => 0];
+        $samples = 2000;
+
+        for ($i = 0; $i < $samples; $i++) {
+            $value = (new Prng("seed-{$i}"))->float('key', ['min' => 0, 'max' => 180, 'step' => 45]);
+            $key = (int) $value;
+
+            $this->assertArrayHasKey($key, $buckets, "Unexpected bucket value: {$value}");
+            $buckets[$key]++;
+        }
+
+        $expected = $samples / 5; // 400 per bucket
+        $tolerance = $expected * 0.35; // ±35% — generous for 2000 samples
+
+        foreach ($buckets as $value => $count) {
+            $this->assertLessThan(
+                $tolerance,
+                abs($count - $expected),
+                "Bucket {$value}: expected ~{$expected} ±{$tolerance}, got {$count}",
+            );
+        }
+    }
+
     public function testFloatIsDeterministic(): void
     {
         $a = new Prng('test');
@@ -332,6 +373,30 @@ class PrngTest extends TestCase
             $a->integer('key', ['min' => 1, 'max' => 100]),
             $b->integer('key', ['min' => 1, 'max' => 100]),
         );
+    }
+
+    public function testIntegerDistributesValuesRoughlyUniformly(): void
+    {
+        $buckets = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+        $samples = 2000;
+
+        for ($i = 0; $i < $samples; $i++) {
+            $value = (new Prng("seed-{$i}"))->integer('key', ['min' => 1, 'max' => 5]);
+
+            $this->assertArrayHasKey($value, $buckets, "Unexpected bucket value: {$value}");
+            $buckets[$value]++;
+        }
+
+        $expected = $samples / 5; // 400 per bucket
+        $tolerance = $expected * 0.35; // ±35% — generous for 2000 samples
+
+        foreach ($buckets as $value => $count) {
+            $this->assertLessThan(
+                $tolerance,
+                abs($count - $expected),
+                "Bucket {$value}: expected ~{$expected} ±{$tolerance}, got {$count}",
+            );
+        }
     }
 
     // shuffle
