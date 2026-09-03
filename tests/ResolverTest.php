@@ -878,4 +878,98 @@ class ResolverTest extends TestCase
         $this->assertGreaterThanOrEqual(-90, $value);
         $this->assertLessThanOrEqual(90, $value);
     }
+
+    // animationSpeed
+
+    public function testAnimationSpeedDefaultsToOne(): void
+    {
+        $resolver = self::makeResolver(self::minimalStyle());
+        $this->assertSame(1.0, $resolver->animationSpeed());
+        $this->assertSame(1.0, $resolver->animationSpeedFor('blink'));
+    }
+
+    public function testSharesTheGlobalFactorWithEveryTimeline(): void
+    {
+        $resolver = self::makeResolver(self::minimalStyle(), ['animationSpeed' => 2]);
+        $this->assertSame(2.0, $resolver->animationSpeedFor('blink'));
+        $this->assertSame(2.0, $resolver->animationSpeedFor(null));
+    }
+
+    public function testLetsANamedDelayWinOverTheGlobalOne(): void
+    {
+        $resolver = self::makeResolver(self::minimalStyle(), [
+            'animationDelay' => 1,
+            'blinkAnimationDelay' => -2,
+        ]);
+
+        $this->assertSame(1.0, $resolver->animationDelay());
+        $this->assertSame(-2.0, $resolver->animationDelayFor('blink'));
+        $this->assertSame(1.0, $resolver->animationDelayFor('sway'));
+        $this->assertSame(1.0, $resolver->animationDelayFor(null));
+        $this->assertSame(0.0, self::makeResolver(self::minimalStyle())->animationDelayFor('blink'));
+    }
+
+    public function testDrawsADelayRangeUnderItsOwnKeySeeded(): void
+    {
+        $options = ['seed' => 'x', 'animationDelay' => [0, 3], 'blinkAnimationDelay' => [0, 3]];
+        $resolver = self::makeResolver(self::minimalStyle(), $options);
+        $global = $resolver->animationDelay();
+        $blink = $resolver->animationDelayFor('blink');
+
+        $this->assertGreaterThanOrEqual(0, $global);
+        $this->assertLessThanOrEqual(3, $global);
+        $this->assertGreaterThanOrEqual(0, $blink);
+        $this->assertLessThanOrEqual(3, $blink);
+        $this->assertNotSame($global, $blink);
+        $this->assertSame($blink, self::makeResolver(self::minimalStyle(), $options)->animationDelayFor('blink'));
+    }
+
+    public function testLetsANamedSwitchWinOverTheGlobalOne(): void
+    {
+        $on = self::makeResolver(self::minimalStyle(), ['animation' => false, 'blinkAnimation' => true]);
+        $this->assertTrue($on->animationPlays('blink'));
+        $this->assertFalse($on->animationPlays('sway'));
+        $this->assertFalse($on->animationPlays(null));
+        $this->assertTrue($on->resolved()['blinkAnimation']);
+        $this->assertArrayNotHasKey('swayAnimation', $on->resolved());
+
+        $off = self::makeResolver(self::minimalStyle(), ['animation' => true, 'blinkAnimation' => false]);
+        $this->assertFalse($off->animationPlays('blink'));
+        $this->assertTrue($off->animationPlays('sway'));
+        $this->assertTrue($off->animationPlays(null));
+    }
+
+    public function testLetsTheSpecificOptionWinOverTheGlobalOne(): void
+    {
+        $resolver = self::makeResolver(self::minimalStyle(), [
+            'animationSpeed' => 0.5,
+            'blinkAnimationSpeed' => 2,
+        ]);
+
+        $this->assertSame(2.0, $resolver->animationSpeedFor('blink'));
+        $this->assertSame(0.5, $resolver->animationSpeedFor('sway'));
+        $this->assertSame(0.5, $resolver->animationSpeedFor(null));
+        $this->assertSame(2.0, $resolver->resolved()['blinkAnimationSpeed']);
+        $this->assertArrayNotHasKey('swayAnimationSpeed', $resolver->resolved());
+    }
+
+    public function testDrawsASpecificRangeUnderItsOwnKey(): void
+    {
+        $options = [
+            'seed' => 'x',
+            'blinkAnimationSpeed' => [0.5, 2],
+            'swayAnimationSpeed' => [0.5, 2],
+        ];
+        $resolver = self::makeResolver(self::minimalStyle(), $options);
+        $blink = $resolver->animationSpeedFor('blink');
+
+        $this->assertGreaterThanOrEqual(0.5, $blink);
+        $this->assertLessThanOrEqual(2, $blink);
+        $this->assertNotSame($blink, $resolver->animationSpeedFor('sway'));
+        $this->assertNotSame(
+            $blink,
+            self::makeResolver(self::minimalStyle(), ['seed' => 'x', 'animationSpeed' => [0.5, 2]])->animationSpeed(),
+        );
+        $this->assertSame($blink, self::makeResolver(self::minimalStyle(), $options)->animationSpeedFor('blink'));
+    }
 }
