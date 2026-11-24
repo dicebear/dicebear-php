@@ -41,6 +41,25 @@ class OptionsTest extends TestCase
         new Options(['size' => -1]);
     }
 
+    public function testThrowsOptionsValidationErrorForIllFormedUtf8OutsideSeedAndTitle(): void
+    {
+        $this->expectException(OptionsValidationError::class);
+        new Options(['seed' => 'x', 'backgroundColor' => ["\xFF"]]);
+    }
+
+    public function testThrowsOptionsValidationErrorPastTheDepthLimit(): void
+    {
+        $value = 'x';
+
+        for ($i = 0; $i < 64; $i++) {
+            $value = [$value];
+        }
+
+        $this->expectException(OptionsValidationError::class);
+        $this->expectExceptionMessage('nesting is deeper than the 64 levels');
+        new Options(['backgroundColor' => $value]);
+    }
+
     public function testErrorIncludesDetails(): void
     {
         try {
